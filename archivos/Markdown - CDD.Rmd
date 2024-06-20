@@ -1,0 +1,139 @@
+---
+title: "ISO/IEC 25012 Modelo de Calidad de Datos"
+author: "Sebastian Matias Romero Davila"
+date: "2024-06-18"
+output:
+  html_document:
+    toc: true
+    toc_depth: 4
+    toc_float: true
+    collapsed: true
+    smooth_scroll: true
+    theme: journal
+    highlight: kate
+    df_print: paged
+    code_folding: show
+---
+
+# *Base de datos inicial*
+Cargamos librerías a emplear
+```{r message=FALSE,warning=FALSE}
+library(tidyverse)
+library(rio)
+```
+Tabla Censo-Oficial
+```{r message=FALSE,warning=FALSE}
+censo <- import("datos_ninos.xlsx", sheet = "censo-oficial")
+censo
+```
+Tabla Resultados
+```{r message=FALSE, warning=FALSE}
+resultados <- import("datos_ninos.xlsx", sheet = "resultados")
+resultados
+```
+# *Características Inherentes*
+
+## Exactitud
+Medida en que los datos representan correctamente la realidad
+```{r message=FALSE, warning=FALSE}
+exactitud1 <- resultados %>% 
+  filter(
+    !between(peso,25,58)|!between(talla,1.10,1.50)
+    |!between(hemoglobina,9,17)|if_any(everything(), is.na)
+    )
+exactitud1
+
+exactitud2 <- censo %>% 
+  filter(
+    if_any(everything(), is.na)
+  )
+exactitud2
+```
+
+## Completitud
+Medida en que todos los valores necesarios están presentes
+```{r message=FALSE, warning=FALSE}
+lostcenso <- colSums(is.na(censo))
+lostcenso
+
+lostresultados <- colSums(is.na(resultados))
+lostresultados
+```
+
+## Consistencia
+Medida en que los datos coherentes dentro del contexto.
+```{r message=FALSE, warning=FALSE}
+consisdata <- resultados %>% 
+  mutate(
+    peso = case_when(
+      between(peso,28,55) ~ peso,
+      peso>=280 ~ peso/10),
+    talla = case_when(
+      between(talla,1.10,1.50) ~ talla*100,
+      is.na(talla) ~ round(mean(talla*100,na.rm = TRUE),1)),
+    parasitos = case_when(
+      between(parasitos,0,1) ~ parasitos,
+      is.na(parasitos) ~ 0)
+    ) %>%  
+  mutate(
+    peso = case_when(
+      between(peso,28,55) ~ peso,
+      is.na(peso) ~ round(mean(peso,na.rm = TRUE),1)),
+      )
+consisdata
+```
+
+## Actualidad
+```{r}
+censo_actual <- censo %>%
+  mutate(
+    edad = as.numeric(trunc(difftime(as.Date("2023-06-01"),date_birth)/365))
+    )
+censo_actual
+```
+
+# *Características Dependientes del sistema*
+
+## Disponibilidad
+Medida en que los datos están disponibles y accesibles cuando se necesitan.
+https://github.com/bastiannseef/data_ninhos.git
+
+## Portabilidad
+Facilididad para trasladar los datos entre sistemas.
+Realizamos un cruce de tablas entre "censo_actual" y "consisdata"
+```{r}
+complete_data <- censo_actual %>% 
+  inner_join(consisdata)
+complete_data
+```
+Luego guardamos la base de datos procesada en formato “.rds”, 
+y también en un archivo “.xlsx”
+```{r}
+data.frame(complete_data) %>% 
+  saveRDS("C:/Users/Sebastian/OneDrive/Escritorio/Trabajo/data/data_procesada/datos.rds")
+
+knitr::include_graphics("C:/Users/Sebastian/OneDrive/Escritorio/Trabajo/archivos/datosrds.png")
+
+readRDS("C:/Users/Sebastian/OneDrive/Escritorio/Trabajo/data/data_procesada/datos.rds") %>%
+  mutate(date_birth = as.Date(date_birth)) %>% 
+  export("C:/Users/Sebastian/OneDrive/Escritorio/Trabajo/data/data_actualizada/data_ninos_limpia.xlsx")
+
+knitr::include_graphics("C:/Users/Sebastian/OneDrive/Escritorio/Trabajo/archivos/data_ninos_limpia.png")
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
